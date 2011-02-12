@@ -1,5 +1,5 @@
-#include<stdlib.h>
-#include<stdio.h>
+#include<cstdlib>
+#include<iostream>
 
 class particle {
  public:
@@ -11,6 +11,7 @@ class particle {
     u[0] = U;
     w[0] = W;
   }
+  double getE(){return e;}
   int getN(){return n;}
   double getU(int n){return u[n];}
   double getW(int n){return w[n];}
@@ -27,4 +28,6 @@ class particle {
   double e;
   double* u;
   double* w;
-}
+};
+
+int run(int, particle, double, double *);
