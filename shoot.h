@@ -31,5 +31,6 @@ class particle {
 };
 
 int run(int, particle, double, double *);
+int run_rk(int, particle, double, double *);
 int potential(double* well, int length, double bound);
 double shoot(particle one, double* well, int steps, double h, int flag);
