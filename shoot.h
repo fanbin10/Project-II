@@ -1,36 +1,10 @@
 #include<cstdlib>
 #include<iostream>
+#include<cmath>
+using namespace std;
 
-class particle {
- public:
-  particle(int N, double E, double U, double W){
-    n = N;
-    u = (double *)malloc(n*sizeof(double));
-    e = E;
-    w = (double *)malloc(n*sizeof(double));
-    u[0] = U;
-    w[0] = W;
-  }
-  double getE(){return e;}
-  int getN(){return n;}
-  double getU(int n){return u[n];}
-  double getW(int n){return w[n];}
-  int saveU(int n, double value){
-    u[n]=value;
-    return 0;
-  }
-  int saveW(int n, double value){
-    w[n] = value;
-    return 0;
-  }
- private:
-  int n;
-  double e;
-  double* u;
-  double* w;
-};
-
-int run(int, particle, double, double *);
-int run_rk(int, particle, double, double *);
+//int run(int, particle, double, double *);
+double run_rk(double*, double*,double*, double, double, int);
 int potential(double* well, int length, double bound);
-double shoot(particle one, double* well, int steps, double h, int flag);
+int search(double* meshP, double* meshV, double* potential, double h, int steps, double resolv);
+double bisec(double low, double lowP, double high, double highP,  double* meshP, double* meshV, double *potential, double E, double h, int steps, double (&range)[3]);

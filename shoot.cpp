@@ -1,38 +1,30 @@
 #include "shoot.h"
-#include <cmath>
-#include <cstdlib>
-#include <iostream>
+#include <iomanip>
 
-int run(int i, particle one, double h, double *potential){
-  one.saveU(i, one.getU(i-1)+one.getW(i-1)*h);
-  one.saveW(i, one.getW(i-1)+one.getU(i-1)*h*3.86*(-1*one.getE()+potential[i]) );
-  return 0;
-};
-
-int run_rk(int i, particle one, double h, double *potential){
+double run_rk(double* meshP, double* meshV, double* potential, double E, double h, int steps){
   double k1[2], k2[2], k3[2], k4[2];
-  double E = one.getE();
-  double U = one.getU(i-1);
-  double W = one.getW(i-1);
-  k1[0] = W;
-  k1[1] = U*(potential[i-1]-E);
+  double U, W;
+  for (int i=0; i<steps-1; i++){
+      U = meshP[i];
+      W = meshV[i];
+      
+      k1[0] = W;
+      k1[1] = U*(potential[i]-E);
 
-  k2[0] = k1[1]*h/2+W;
-  k2[1] = ((potential[i-1]+potential[i])/2-E)*(k1[0]*h/2+U);
+      k2[0] = k1[1]*h/2+W;
+      k2[1] = ((potential[i]+potential[i+1])/2-E)*(k1[0]*h/2+U);
 
-  k3[0] = k2[1]*h/2+W;
-  k3[1] = ((potential[i-1]+potential[i])/2-E)*(k2[0]*h/2+U);
+      k3[0] = k2[1]*h/2+W;
+      k3[1] = ((potential[i]+potential[i+1])/2-E)*(k2[0]*h/2+U);
 
-  k4[0] = k3[1]*h+W;
-  k4[1] = (potential[i]-E)*(k3[0]*h+U);
+      k4[0] = k3[1]*h+W;
+      k4[1] = (potential[i+1]-E)*(k3[0]*h+U);
+      
+      meshP[i+1] = U + 1.0/6*h*(k1[0]+2*k2[0]+2*k3[0]+k4[0]);
+      meshV[i+1] = W + 1.0/6*h*(k1[1]+2*k2[1]+2*k3[1]+k4[1]);
+    }
 
-  U = U + 1.0/6*h*(k1[0]+2*k2[0]+2*k3[0]+k4[0]);
-  W = W + 1.0/6*h*(k1[1]+2*k2[1]+2*k3[1]+k4[1]);
-
-  one.saveU(i, U);
-  one.saveW(i, W);
-
-  return 0;
+  return meshP[steps-1];
 };
 
 int potential(double* well, int length, double h){
@@ -47,27 +39,60 @@ int potential(double* well, int length, double h){
   return 0;
 };
 
-double shoot(particle one, double* well, int steps, double h, int flag){
-  FILE *pipe = popen("gnuplot -persist","w");
-  FILE *fp;
-  double temp;
-  if ( ((fp = fopen("plot.dat","w")) == NULL) )
-    { 
-      printf("Error can't open plot.dat for writing.\n");
-      exit(1);
+
+int search(double* meshP, double* meshV, double* potential, double h, int steps, double resolv){
+  int keyN = floor(1/resolv);
+  int N=0;
+  double  E;
+  double* keys = (double*)malloc(sizeof(double)*(keyN+1));
+  double range[]={0,0,0};
+  for (int m=0; m<2; m++){
+    meshP[0]=m;
+    meshV[0]=1-m;
+    keys[0]=run_rk(meshP, meshV, potential, 0, h, steps);
+    for (int i=1; i<=keyN; i++ ){
+      E = -1.0*i*resolv*40;
+      keys[i]=run_rk(meshP, meshV, potential, E, h, steps);
+      if ( (keys[i]*keys[i-1]) < 0 ){
+	bisec(-1*i*resolv-resolv, keys[i-1],  -1*i*resolv, keys[i],meshP, meshV, potential, E, h, steps, range);
+	N++;
+	if (m==0)
+	  cout<<setiosflags(ios::fixed)<<setprecision(6)<<"Energy state found:  "<<range[0]<<" (odd) "<<"Range ["<<range[1]<<" "<<range[2]<<"]"<<endl;
+	else
+	  cout<<setiosflags(ios::fixed)<<setprecision(6)<<"Energy state found:  "<<range[0]<<" (even) "<<"Range ["<<range[1]<<" "<<range[2]<<"]"<<endl;
+      }
     }
+  }
+  return N;
+};
+
+double bisec(double low, double lowP,  double high, double highP, double* meshP, double* meshV, double *potential, double E, double h, int steps, double (&range)[3]){
+  if (high-low < 0.00001){
+    range[0] = 0.5*(low+high);
+    range[1] = low;
+    range[2] = high;
+    return range[0];
+  }
+  double middle = 0.5*(low+high);
+  double middleP = run_rk(meshP, meshV, potential, middle, h, steps);
+
+  if (middleP * lowP < 0)
+    bisec(low, lowP,  middle, middleP,meshP, meshV, potential, E, h, steps, range);
+  else
+    bisec(middle, middleP, high, highP, meshP, meshV, potential, E, h, steps, range);
+  return range[0];
+};
+/*
+double shoot(, double* well, int steps, double h, int flag){
+ 
   for (int i=1; i<steps-1; i++){
-    run_rk(i, one, h, well);
+    run(i, one, h, well);
     temp = one.getU(i);
     if (flag == 1){
       fprintf(fp,"%lf\t%lf\n",i*h,one.getU(i) );
       fflush(fp);
       usleep(1);
-      fprintf(pipe,"set xrange [0:%d]\n", (int)floor(h*steps));
-      fflush(pipe);
-      fprintf(pipe,"set yrange [-10:10]\n");
-      fflush(pipe);
-      fprintf(pipe,"plot 'plot.dat' with lines\n");
+     
       fflush(pipe);
       usleep(1);
     }
@@ -75,3 +100,4 @@ double shoot(particle one, double* well, int steps, double h, int flag){
   return temp;
 }
 
+*/
